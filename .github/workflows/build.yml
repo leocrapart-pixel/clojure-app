@@ -51,7 +51,20 @@ jobs:
         run: flutter create --platforms=android --project-name clojure_app --org com.leocrapart .
 
       - name: Compile ClojureDart to Dart
-        run: clojure -M:cljd compile
+        run: |
+          set +e
+          status=0
+          for ns in clojure-app.theme clojure-app.astro clojure-app.cycle clojure-app.ui clojure-app.main; do
+            echo "::group::compile $ns"
+            clojure -M:cljd compile "$ns"
+            rc=$?
+            echo "::endgroup::"
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::compile failed for $ns"
+              status=1
+            fi
+          done
+          exit "$status"
 
       - name: Inspect compiled output
         run: |

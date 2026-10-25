@@ -23,7 +23,7 @@
   (+ 2440587.5 (/ (.-millisecondsSinceEpoch dt) 86400000.0)))
 
 (defn date-of [jd]
-  (dart:core/DateTime.fromMillisecondsSinceEpoch
+  (DateTime.fromMillisecondsSinceEpoch
     (math/round (* (- jd 2440587.5) 86400000.0))))
 
 (defn normalize-deg [x]
