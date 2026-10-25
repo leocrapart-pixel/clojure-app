@@ -20,6 +20,7 @@
       (m/Scaffold
         .body
         (m/Center
+          .child
           (m/Text "Le Voyage de Vénus"
             .style
             (m/TextStyle

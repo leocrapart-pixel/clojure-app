@@ -1,0 +1,153 @@
+(ns clojure-app.astro
+  "Éphéméride géocentrique de Vénus, du Soleil et de la Lune.
+
+  Vénus et la Terre viennent d'une série VSOP87 tronquée (voir
+  clojure-app.astro.vsop), ce qui donne une longitude à mieux que la minute
+  d'arc sur la période 1800-2200. Les séries sont rapportées à l'écliptique
+  J2000 : on ajoute la précession générale en longitude pour obtenir des
+  positions tropicales, celles qu'affiche le site de référence.
+
+  La Lune suit les termes principaux de Meeus (chapitre 47), suffisants pour
+  dater une conjonction Vénus-Lune à quelques heures près.
+
+  Les dates sont des jours juliens (JD) en temps universel."
+  (:require [clojure-app.astro.vsop :as vsop]
+            [cljd.math :as math]))
+
+(def ^:private days-per-millennium 365250.0)
+(def ^:private days-per-century 36525.0)
+(def j2000 2451545.0)
+(def ^:private rad (/ math/PI 180.0))
+
+(defn jd-of [dt]
+  (+ 2440587.5 (/ (.-millisecondsSinceEpoch dt) 86400000.0)))
+
+(defn date-of [jd]
+  (dart:core/DateTime.fromMillisecondsSinceEpoch
+    (math/round (* (- jd 2440587.5) 86400000.0))))
+
+(defn normalize-deg [x]
+  (let [m (mod x 360.0)]
+    (if (< m 0.0) (+ m 360.0) m)))
+
+(defn signed-deg [x]
+  "Ramène un écart d'angle dans ]-180, 180]."
+  (let [m (normalize-deg x)]
+    (if (> m 180.0) (- m 360.0) m)))
+
+(defn- vsop-coord
+  "Somme d'une coordonnée VSOP : chaque série i est multipliée par t^i."
+  [groups t]
+  (let [n (count groups)]
+    (loop [i 0 tp 1.0 acc 0.0]
+      (if (< i n)
+        (let [terms (nth groups i)
+              s (loop [ts terms acc2 0.0]
+                  (if (seq ts)
+                    (let [term (first ts)
+                          a (nth term 0)
+                          b (nth term 1)
+                          c (nth term 2)]
+                      (recur (rest ts) (+ acc2 (* a (math/cos (+ b (* t c)))))))
+                    acc2))]
+          (recur (inc i) (* tp t) (+ acc (* tp s))))
+        acc))))
+
+(defn- helio
+  "Coordonnées héliocentriques écliptiques J2000 d'un corps VSOP."
+  [model jd]
+  (let [t (/ (- jd j2000) days-per-millennium)
+        lon (normalize-deg (/ (vsop-coord (nth model 0) t) rad))
+        lat (/ (vsop-coord (nth model 1) t) rad)
+        r (vsop-coord (nth model 2) t)
+        cl (math/cos (* lat rad))
+        x (* r cl (math/cos (* lon rad)))
+        y (* r cl (math/sin (* lon rad)))
+        z (* r (math/sin (* lat rad)))]
+    {:lon lon :lat lat :r r :x x :y y :z z}))
+
+(defn- precession
+  "Précession générale en longitude, en degrés, depuis J2000."
+  [jd]
+  (let [t (/ (- jd j2000) days-per-century)]
+    (/ (+ (* 5029.0966 t) (* 1.11113 t t) (* -0.000006 t t t)) 3600.0)))
+
+(defn venus-geo
+  "Position géocentrique de Vénus, tropicale, écliptique de la date."
+  [jd]
+  (let [v (helio vsop/venus jd)
+        e (helio vsop/earth jd)
+        x (- (:x v) (:x e))
+        y (- (:y v) (:y e))
+        z (- (:z v) (:z e))
+        d (math/sqrt (+ (* x x) (* y y) (* z z)))
+        lon (normalize-deg (/ (math/atan2 y x) rad))
+        lat (/ (math/atan2 z (math/sqrt (+ (* x x) (* y y)))) rad)]
+    {:lon (normalize-deg (+ lon (precession jd)))
+     :lat lat
+     :dist d}))
+
+(defn sun-lon
+  "Longitude géocentrique du Soleil, tropicale."
+  [jd]
+  (let [e (helio vsop/earth jd)]
+    (normalize-deg (+ (:lon e) 180.0 (precession jd)))))
+
+(defn sun-lat [jd] 0.0)
+
+(defn moon-lon
+  "Longitude géocentrique de la Lune (Meeus 47), rapportée à l'équinoxe moyen
+  de la date."
+  [jd]
+  (let [t (/ (- jd j2000) days-per-century)
+        lp (+ 218.3164477 (* 481267.88123421 t) (* -0.0015786 t t))
+        d (+ 297.8501921 (* 445267.1114034 t) (* -0.0018819 t t))
+        m (+ 357.5291092 (* 35999.0502909 t) (* -0.0001536 t t))
+        mp (+ 134.9633964 (* 477198.8675055 t) (* 0.0087414 t t))
+        f (+ 93.2720950 (* 483202.0175233 t) (* -0.0036539 t t))
+        s (fn [x] (math/sin (* (normalize-deg x) rad)))]
+    (normalize-deg
+      (+ lp
+         (* 6.288774 (s mp))
+         (* 1.274027 (s (- (* 2 d) mp)))
+         (* 0.658314 (s (* 2 d)))
+         (* 0.213618 (s (* 2 mp)))
+         (* -0.185116 (s m))
+         (* -0.114332 (s (* 2 f)))
+         (* 0.058793 (s (- (* 2 d) (* 2 mp))))
+         (* 0.057066 (s (- (* 2 d) m mp)))
+         (* 0.053322 (s (+ (* 2 d) mp)))
+         (* 0.045758 (s (- (* 2 d) m)))
+         (* -0.040923 (s (- m mp)))
+         (* -0.034720 (s d))
+         (* -0.030383 (s (+ m mp)))
+         (* 0.015327 (s (- (* 2 d) (* 2 f))))
+         (* -0.012528 (s (+ mp (* 2 f))))
+         (* 0.010980 (s (- mp (* 2 f))))
+         (* 0.010675 (s (- (* 4 d) mp)))
+         (* 0.010034 (s (* 3 mp)))
+         (* 0.008548 (s (- (* 4 d) (* 2 mp))))
+         (* -0.007888 (s (- (+ (* 2 d) m) mp)))
+         (* -0.006766 (s (+ (* 2 d) m)))
+         (* -0.005163 (s (- d mp)))
+         (* 0.004987 (s (+ d m)))
+         (* 0.004036 (s (+ (- (* 2 d) m) mp)))
+         (* 0.003994 (s (+ (* 2 d) (* 2 mp))))
+         (* 0.003861 (s (* 4 d)))
+         (* 0.003665 (s (- (* 2 d) (* 3 mp))))))))
+
+(defn elongation
+  "Élongation de Vénus au Soleil : négative à l'ouest (étoile du matin),
+  positive à l'est (étoile du soir)."
+  [jd]
+  (signed-deg (- (:lon (venus-geo jd)) (sun-lon jd))))
+
+(defn phase-name
+  "Nom de la phase vénusienne pour une élongation signée."
+  [elong]
+  (if (< elong 0.0) "Étoile du matin" "Étoile du soir"))
+
+(defn retrograde?
+  "Vénus recule-t-elle en longitude géocentrique au jour jd ?"
+  [jd]
+  (< (signed-deg (- (:lon (venus-geo (+ jd 1.0))) (:lon (venus-geo jd)))) 0.0))
