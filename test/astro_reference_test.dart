@@ -37,6 +37,7 @@ void main() {
     final length = (cyc.cycle_length_of(jd) as num).toDouble();
 
     // Cycle attendu : 24/10/2026 -> 01/06/2028, soit 586 jours.
+    expect(cyc.fmt_date(start) as String, contains('24 octobre'));
     expect(cyc.fmt_date(start) as String, contains('2026'));
     expect(cyc.fmt_date(end) as String, contains('2028'));
     expect(length, closeTo(586.0, 3.0));

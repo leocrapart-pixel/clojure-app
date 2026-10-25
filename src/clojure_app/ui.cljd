@@ -490,7 +490,7 @@
       .body
       (m/Stack .children [background stars safe]))))
 
-(def preview-jd 2461343.850694444)
+(def preview-jd 2461338.850694444)
 
 (defn preview []
   (page {:jd preview-jd :open nil}

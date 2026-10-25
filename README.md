@@ -38,6 +38,16 @@ Vérification effectuée sur le 25 octobre 2026 à 08:25 UTC : Vénus à 0°1′
 Scorpion, latitude −6,3°, élongation −1,9° — valeurs identiques à celles du site
 de référence.
 
+## Vérifications
+
+`flutter test` exécute deux suites :
+
+- `test/astro_reference_test.dart` compare l'éphéméride compilée aux valeurs
+  publiées par le site de référence (Vénus à 0°1′ du Scorpion le 25/10/2026,
+  élongation −1,9°, cycle 24/10/2026 → 01/06/2028) ;
+- `test/layout_smoke_test.dart` rend l'écran complet en 320×640, 390×844 et
+  1280×800 et échoue sur tout débordement de mise en page.
+
 ## Construire
 
 La compilation passe par **GitHub Actions** : le JDK, la CLI Clojure, Flutter et
