@@ -1,0 +1,11 @@
+{
+  "name": "Le Voyage de Vénus",
+  "short_name": "Vénus",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#030308",
+  "theme_color": "#07080d",
+  "description": "Le cycle synodique de Vénus calculé dans le navigateur.",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false
+}
