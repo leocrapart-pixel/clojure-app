@@ -206,32 +206,32 @@
          (m/LayoutBuilder
            .builder
            (fn [_ cons]
-             (let [w (.-maxWidth cons)]
+             (let [w (.-maxWidth cons)
+                   bar (m/Container
+                         .height 10.0
+                         .decoration
+                         (m/BoxDecoration
+                           .gradient
+                           (m/LinearGradient
+                             .begin m/Alignment.centerLeft
+                             .end m/Alignment.centerRight
+                             .colors [th/venus-deep th/venus th/under th/under-deep th/under th/venus th/venus-deep])
+                           .borderRadius (m/BorderRadius.circular 999.0)))
+                   ticks (for [p portals]
+                           (m/Positioned
+                             .left (- (* w (frac (:jd p))) 1.0)
+                             .top -4.0
+                             .child
+                             (m/Container
+                               .width 2.0
+                               .height 18.0
+                               .decoration
+                               (m/BoxDecoration
+                                 .color th/ink-dim
+                                 .borderRadius (m/BorderRadius.circular 2.0)))))]
                (m/Stack
                  .clipBehavior m/Clip.none
-                 .children
-                 [(m/Container
-                    .height 10.0
-                    .decoration
-                    (m/BoxDecoration
-                      .gradient
-                      (m/LinearGradient
-                        .begin m/Alignment.centerLeft
-                        .end m/Alignment.centerRight
-                        .colors [th/venus-deep th/venus th/under th/under-deep th/under th/venus th/venus-deep])
-                      .borderRadius (m/BorderRadius.circular 999.0)))
-                  (for [p portals]
-                    (m/Positioned
-                      .left (- (* w (frac (:jd p))) 1.0)
-                      .top -4.0
-                      .child
-                      (m/Container
-                        .width 2.0
-                        .height 18.0
-                        .decoration
-                        (m/BoxDecoration
-                          .color th/ink-dim
-                          .borderRadius (m/BorderRadius.circular 2.0)))))]))))
+                 .children (into [bar] ticks)))))
          (spacer 12.0)
          (m/Wrap
            .spacing 14.0
@@ -366,6 +366,25 @@
              (if (< i (count portals)) (nth portals i) nil)
              open ui)))])))
 
+(defn day-row [label jd]
+  (m/Container
+    .margin (m/EdgeInsets.only .bottom 8.0)
+    .padding (m/EdgeInsets.all 14.0)
+    .decoration
+    (m/BoxDecoration
+      .gradient (m/LinearGradient
+                  .begin m/Alignment.centerLeft
+                  .end m/Alignment.centerRight
+                  .colors [(m/Color.fromARGB 40 59 29 110) (m/Color.fromARGB 10 59 29 110)])
+      .border (m/Border.all .color th/under-deep .width 1.0)
+      .borderRadius (m/BorderRadius.circular th/r-sm))
+    .child
+    (m/Row
+      .mainAxisAlignment m/MainAxisAlignment.spaceBetween
+      .children
+      [(txt-w label 13.0 th/ink m/FontWeight.w500)
+       (txt (cyc/fmt-date jd) 12.0 th/ink-dim)])))
+
 (defn underworld [s]
   (let [c (:cycle s)
         j1 (:underworld-start s)
@@ -376,26 +395,9 @@
       .children
       [(eyebrow "Inframonde · les trois jours")
        (spacer 10.0)
-       (m/Column
-         .children
-         (for [d [[1 "Jour 1" j1] [2 "Jour 2" j2] [3 "Jour 3" j3]]]
-           (m/Container
-             .margin (m/EdgeInsets.only .bottom 8.0)
-             .padding (m/EdgeInsets.all 14.0)
-             .decoration
-             (m/BoxDecoration
-               .gradient (m/LinearGradient
-                           .begin m/Alignment.centerLeft
-                           .end m/Alignment.centerRight
-                           .colors [(m/Color.fromARGB 40 59 29 110) (m/Color.fromARGB 10 59 29 110)])
-               .border (m/Border.all .color th/under-deep .width 1.0)
-               .borderRadius (m/BorderRadius.circular th/r-sm))
-             .child
-             (m/Row
-               .mainAxisAlignment m/MainAxisAlignment.spaceBetween
-               .children
-               [(txt-w (nth d 1) 13.0 th/ink m/FontWeight.w500)
-                (txt (cyc/fmt-date (nth d 2)) 12.0 th/ink-dim)])))))]))
+       (day-row "Jour 1" j1)
+       (day-row "Jour 2" j2)
+       (day-row "Jour 3" j3)])))
 
 (defn footer []
   (m/Column
@@ -441,46 +443,42 @@
         s (cyc/sky jd)
         c (:cycle s)
         portals (cyc/cycle-portals c)
-        nextp (cyc/next-portal jd c)]
+        nextp (cyc/next-portal jd c)
+        column (m/Column
+                 .crossAxisAlignment m/CrossAxisAlignment.start
+                 .children
+                 [(header)
+                  (spacer 20.0)
+                  (hero s nextp)
+                  (spacer 16.0)
+                  (moment-card s ui now)
+                  (spacer 16.0)
+                  (cycle-card s)
+                  (spacer 16.0)
+                  (cycle-band c portals)
+                  (spacer 16.0)
+                  (sky-grid s)
+                  (spacer 22.0)
+                  (descent portals state ui)
+                  (spacer 22.0)
+                  (underworld s)
+                  (spacer 22.0)
+                  (footer)])
+        inner (m/Padding
+                .padding (m/EdgeInsets.fromLTRB 20.0 28.0 20.0 40.0)
+                .child column)
+        sized (m/ConstrainedBox
+                .constraints (m/BoxConstraints .maxWidth 980.0)
+                .child inner)
+        scroller (m/SingleChildScrollView
+                   .child (m/Center .child sized))
+        safe (m/SafeArea .child scroller)
+        background (m/Positioned.fill
+                     .child
+                     (m/DecoratedBox
+                       .decoration (m/BoxDecoration .gradient (th/backdrop))))
+        stars (m/Positioned.fill .child (starfield))]
     (m/Scaffold
       .backgroundColor th/bg-deep
       .body
-      (m/Stack
-        .children
-        [(m/Positioned.fill
-           .child
-           (m/DecoratedBox
-             .decoration (m/BoxDecoration .gradient (th/backdrop))))
-         (m/Positioned.fill .child (starfield))
-         (m/SafeArea
-           .child
-           (m/SingleChildScrollView
-             .child
-             (m/Center
-               .child
-               (m/ConstrainedBox
-                 .constraints (m/BoxConstraints .maxWidth 980.0)
-                 .child
-                 (m/Padding
-                   .padding (m/EdgeInsets.fromLTRB 20.0 28.0 20.0 40.0)
-                   .child
-                   (m/Column
-                     .crossAxisAlignment m/CrossAxisAlignment.start
-                     .children
-                     [(header)
-                      (spacer 20.0)
-                      (hero s nextp)
-                      (spacer 16.0)
-                      (moment-card s ui now)
-                      (spacer 16.0)
-                      (cycle-card s)
-                      (spacer 16.0)
-                      (cycle-band c portals)
-                      (spacer 16.0)
-                      (sky-grid s)
-                      (spacer 22.0)
-                      (descent portals state ui)
-                      (spacer 22.0)
-                      (underworld s)
-                      (spacer 22.0)
-                      (footer)])))))))])))
+      (m/Stack .children [background stars safe]))))
