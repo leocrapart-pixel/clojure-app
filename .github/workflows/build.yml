@@ -71,7 +71,7 @@ jobs:
           exit "$status"
 
       - name: Run astronomy tests
-        run: flutter test test/astro_reference_test.dart
+        run: flutter test
 
       - name: Inspect compiled output
         run: |

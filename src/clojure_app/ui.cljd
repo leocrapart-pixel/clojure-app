@@ -44,7 +44,7 @@
       .children
       [(dot color 6.0)
        (m/SizedBox .width 6.0)
-       (txt label 11.0 th/ink-dim)])))
+       (m/Flexible .child (txt label 11.0 th/ink-dim))])))
 
 (defn badge [label color]
   (m/Container
@@ -118,7 +118,8 @@
         [(m/Row
            .mainAxisAlignment m/MainAxisAlignment.spaceBetween
            .children
-           [(eyebrow "Prochain portail")
+           [(m/Expanded .child (eyebrow "Prochain portail"))
+            (m/SizedBox .width 8.0)
             (badge (str "portail " idx) th/venus)])
          (spacer 12.0)
          (txt-w name 21.0 th/ink m/FontWeight.w600)
@@ -160,11 +161,14 @@
   (m/Row
     .mainAxisAlignment m/MainAxisAlignment.spaceBetween
     .children
-    [(m/Row
-       .children
-       [(dot color 6.0)
-        (m/SizedBox .width 8.0)
-        (txt label 12.0 th/ink-dim)])
+    [(m/Expanded
+       .child
+       (m/Row
+         .children
+         [(dot color 6.0)
+          (m/SizedBox .width 8.0)
+          (m/Flexible .child (txt label 12.0 th/ink-dim))]))
+     (m/SizedBox .width 8.0)
      (txt (cyc/fmt-date jd) 12.0 th/ink)]))
 
 (defn cycle-card [s]
@@ -192,7 +196,7 @@
     .children
     [(dot color 6.0)
      (m/SizedBox .width 6.0)
-     (txt label 11.0 th/ink-faint)]))
+     (m/Flexible .child (txt label 11.0 th/ink-faint))]))
 
 (defn cycle-band [c portals]
   (let [len (:length c)
@@ -321,18 +325,20 @@
         .crossAxisAlignment m/CrossAxisAlignment.start
         .children
         [(m/Row
-           .mainAxisAlignment m/MainAxisAlignment.spaceBetween
+           .crossAxisAlignment m/CrossAxisAlignment.start
            .children
-           [(m/Row
-              .children
-              [(badge (str (inc i)) th/ink-ghost)
-               (m/SizedBox .width 10.0)
-               (m/Column
-                 .crossAxisAlignment m/CrossAxisAlignment.start
-                 .children
-                 [(txt-w (:name c) 14.0 th/ink m/FontWeight.w500)
-                  (txt (:sanskrit c) 11.0 th/ink-faint)])])
-            (txt (:garment c) 11.0 th/ink-dim)])
+           [(badge (str (inc i)) th/ink-ghost)
+            (m/SizedBox .width 10.0)
+            (m/Expanded
+              .child
+              (m/Column
+                .crossAxisAlignment m/CrossAxisAlignment.start
+                .children
+                [(txt-w (:name c) 14.0 th/ink m/FontWeight.w500)
+                 (spacer 2.0)
+                 (txt (:sanskrit c) 11.0 th/ink-faint)
+                 (spacer 3.0)
+                 (txt (:garment c) 11.0 th/ink-dim)]))])
          (if (= open i)
            (m/Padding
              .padding (m/EdgeInsets.only .top 10.0)
@@ -382,8 +388,9 @@
     (m/Row
       .mainAxisAlignment m/MainAxisAlignment.spaceBetween
       .children
-      [(txt-w label 13.0 th/ink m/FontWeight.w500)
-       (txt (cyc/fmt-date jd) 12.0 th/ink-dim)])))
+      [(m/Expanded .child (txt-w label 13.0 th/ink m/FontWeight.w500))
+       (m/SizedBox .width 8.0)
+       (m/Flexible .child (txt (cyc/fmt-date jd) 12.0 th/ink-dim))])))
 
 (defn underworld [s]
   (let [c (:cycle s)
@@ -482,3 +489,10 @@
       .backgroundColor th/bg-deep
       .body
       (m/Stack .children [background stars safe]))))
+
+(def preview-jd 2461343.850694444)
+
+(defn preview []
+  (page {:jd preview-jd :open nil}
+        (atom {:jd preview-jd :open nil})
+        preview-jd))
