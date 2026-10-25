@@ -45,8 +45,23 @@ jobs:
           clojure --version
           flutter --version
 
+      # Generate the Android host project for the installed Flutter version,
+      # so the Gradle/AGP/Kotlin versions always match the SDK on the runner.
+      - name: Generate Android host project
+        run: flutter create --platforms=android --project-name clojure_app --org com.leocrapart .
+
       - name: Compile ClojureDart to Dart
-        run: clj -M:cljd compile
+        run: clojure -M:cljd compile
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: clojure-app-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
 
       - name: Build Flutter web
         run: flutter build web --release --base-href "/clojure-app/"
