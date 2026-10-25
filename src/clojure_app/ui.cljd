@@ -57,7 +57,7 @@
 
 (defn step-button [label delta ui]
   (m/GestureDetector
-    .onTap (fn [_] (swap! ui update :jd (fn [jd] (+ jd delta))))
+    .onTap (fn [] (swap! ui update :jd (fn [jd] (+ jd delta))))
     .child
     (m/Container
       .padding (m/EdgeInsets.symmetric .horizontal 12.0 .vertical 8.0)
@@ -70,7 +70,7 @@
 
 (defn reset-button [ui now]
   (m/GestureDetector
-    .onTap (fn [_] (swap! ui assoc :jd now))
+    .onTap (fn [] (swap! ui assoc :jd now))
     .child
     (m/Container
       .padding (m/EdgeInsets.symmetric .horizontal 12.0 .vertical 8.0)
@@ -304,7 +304,7 @@
 
 (defn chakra-row [i c portal open ui]
   (m/GestureDetector
-    .onTap (fn [_] (swap! ui assoc :open (if (= open i) nil i)))
+    .onTap (fn [] (swap! ui assoc :open (if (= open i) nil i)))
     .child
     (m/Container
       .margin (m/EdgeInsets.only .bottom 8.0)
@@ -400,11 +400,11 @@
        (day-row "Jour 3" j3)])))
 
 (defn footer []
-  (m/Column
-    .crossAxisAlignment m.CrossAxisAlignment.start
-    .children
-    [(txt "Éphéméride VSOP87 tronquée · position de la Lune d'après Meeus (ch. 47) · tout est calculé localement, sans réseau."
-       11.0 th/ink-faint)]))
+  (m/Align
+    .alignment m/Alignment.centerLeft
+    .child
+    (txt "Éphéméride VSOP87 tronquée · Lune d'après Meeus (ch. 47) · tout est calculé localement, sans réseau."
+      11.0 th/ink-faint)))
 
 ;; -------------------------------------------------------------------- écran
 

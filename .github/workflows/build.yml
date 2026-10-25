@@ -66,6 +66,9 @@ jobs:
           done
           exit "$status"
 
+      - name: Run astronomy tests
+        run: flutter test
+
       - name: Inspect compiled output
         run: |
           echo "compiled dart entry points:"

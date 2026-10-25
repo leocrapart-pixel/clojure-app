@@ -151,3 +151,9 @@
   "Vénus recule-t-elle en longitude géocentrique au jour jd ?"
   [jd]
   (< (signed-deg (- (:lon (venus-geo (+ jd 1.0))) (:lon (venus-geo jd)))) 0.0))
+
+(defn venus-lon [jd] (:lon (venus-geo jd)))
+
+(defn venus-lat [jd] (:lat (venus-geo jd)))
+
+(defn venus-dist [jd] (:dist (venus-geo jd)))

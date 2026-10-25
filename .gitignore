@@ -6,6 +6,7 @@ test/cljd-out/
 
 # Flutter / Dart
 .dart_tool/
+pubspec.lock
 .packages
 .flutter-plugins
 .flutter-plugins-dependencies

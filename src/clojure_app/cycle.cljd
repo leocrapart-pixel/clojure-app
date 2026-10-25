@@ -181,3 +181,14 @@
      :day (inc (math/round (- jd (:start cycle))))
      :cycle-length (math/round (:length cycle))
      :to-end (math/round (- (:end cycle) jd))}))
+
+(defn cycle-start [jd] (:start (cycle-at jd)))
+
+(defn cycle-end [jd] (:end (cycle-at jd)))
+
+(defn cycle-length-of [jd] (:length (cycle-at jd)))
+
+(defn next-portal-jd [jd]
+  (let [c (cycle-at jd)
+        p (next-portal jd c)]
+    (if (some? p) (:jd p) -1.0)))
