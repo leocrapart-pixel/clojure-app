@@ -53,6 +53,11 @@ jobs:
       - name: Compile ClojureDart to Dart
         run: clojure -M:cljd compile
 
+      - name: Inspect compiled output
+        run: |
+          echo "compiled dart entry points:"
+          find lib -name '*.dart' | head -20
+
       - name: Build Android APK
         run: flutter build apk --release
 

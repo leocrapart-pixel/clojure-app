@@ -1,28 +1,28 @@
 (ns clojure-app.main
   "Le Voyage de Vénus — point d'entrée de l'application."
   (:require ["package:flutter/material.dart" :as m]
-            [cljd.flutter :as f]))
+            [cljd.flutter :as f]
+            [clojure-app.astro :as astro]
+            [clojure-app.theme :as th]
+            [clojure-app.ui :as ui]))
+
+(def now-jd (astro/jd-of (DateTime.now)))
+
+(def app-state (atom {:jd now-jd :open nil}))
 
 (defn main []
-  (f/run
-    (m/MaterialApp
-      .title "Le Voyage de Vénus"
-      .debugShowCheckedModeBanner false
-      .theme
-      (m/ThemeData
-        .brightness m/Brightness.dark
-        .scaffoldBackgroundColor (m/Color.fromARGB 255 3 3 8)
-        .colorScheme
-        (m/ColorScheme.dark
-          .primary (m/Color.fromARGB 255 124 224 176)
-          .surface (m/Color.fromARGB 255 13 15 26)))
-      .home
-      (m/Scaffold
-        .body
-        (m/Center
-          .child
-          (m/Text "Le Voyage de Vénus"
-            .style
-            (m/TextStyle
-              .color (m/Color.fromARGB 255 236 238 246)
-              .fontSize 32.0)))))))
+  (m/runApp
+    (f/widget
+      :watch [state app-state]
+      (m/MaterialApp
+        .title "Le Voyage de Vénus"
+        .debugShowCheckedModeBanner false
+        .theme
+        (m/ThemeData
+          .brightness m/Brightness.dark
+          .scaffoldBackgroundColor th/bg-deep
+          .colorScheme
+          (m/ColorScheme.dark
+            .primary th/venus
+            .surface th/panel))
+        .home (ui/page state app-state now-jd)))))

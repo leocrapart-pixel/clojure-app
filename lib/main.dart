@@ -1,1 +1,1 @@
-export 'cljd-out/clojure_app/main.dart' show main;
+export 'cljd-out/clojure-app/main.dart' show main;

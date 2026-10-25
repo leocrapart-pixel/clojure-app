@@ -1,0 +1,486 @@
+(ns clojure-app.ui
+  "Composition de l'écran : en-tête, portail à venir, moment observé, cycle,
+  bande du cycle, lecture du ciel, descente des chakras, inframonde."
+  (:require ["package:flutter/material.dart" :as m]
+            [cljd.string :as str]
+            [cljd.math :as math]
+            [clojure-app.astro :as astro]
+            [clojure-app.cycle :as cyc]
+            [clojure-app.theme :as th]))
+
+;; ------------------------------------------------------------------ briques
+
+(defn txt [s size color]
+  (m/Text s .style (m/TextStyle .color color .fontSize size)))
+
+(defn txt-w [s size color weight]
+  (m/Text s .style (m/TextStyle .color color .fontSize size .fontWeight weight)))
+
+(defn eyebrow [s]
+  (m/Text (str/upper-case s)
+    .style (m/TextStyle
+             .color th/ink-faint
+             .fontSize 11.0
+             .fontWeight m/FontWeight.w600
+             .letterSpacing 1.7)))
+
+(defn dot [color size]
+  (m/Container
+    .width size
+    .height size
+    .decoration (m/BoxDecoration .color color .shape m/BoxShape.circle)))
+
+(defn chip-status [label color]
+  (m/Container
+    .padding (m/EdgeInsets.symmetric .horizontal 9.0 .vertical 5.0)
+    .decoration
+    (m/BoxDecoration
+      .color (m/Color.fromARGB 16 255 255 255)
+      .border (m/Border.all .color (m/Color.fromARGB 34 255 255 255) .width 1.0)
+      .borderRadius (m/BorderRadius.circular 999.0))
+    .child
+    (m/Row
+      .mainAxisSize m/MainAxisSize.min
+      .children
+      [(dot color 6.0)
+       (m/SizedBox .width 6.0)
+       (txt label 11.0 th/ink-dim)])))
+
+(defn badge [label color]
+  (m/Container
+    .padding (m/EdgeInsets.symmetric .horizontal 8.0 .vertical 3.0)
+    .decoration
+    (m/BoxDecoration
+      .border (m/Border.all .color color .width 1.0)
+      .borderRadius (m/BorderRadius.circular 999.0))
+    .child (txt label 10.0 color)))
+
+(defn step-button [label delta ui]
+  (m/GestureDetector
+    .onTap (fn [_] (swap! ui update :jd (fn [jd] (+ jd delta))))
+    .child
+    (m/Container
+      .padding (m/EdgeInsets.symmetric .horizontal 12.0 .vertical 8.0)
+      .decoration
+      (m/BoxDecoration
+        .color (m/Color.fromARGB 12 255 255 255)
+        .border (m/Border.all .color th/line .width 1.0)
+        .borderRadius (m/BorderRadius.circular th/r-sm))
+      .child (txt label 12.0 th/ink-dim))))
+
+(defn reset-button [ui now]
+  (m/GestureDetector
+    .onTap (fn [_] (swap! ui assoc :jd now))
+    .child
+    (m/Container
+      .padding (m/EdgeInsets.symmetric .horizontal 12.0 .vertical 8.0)
+      .decoration
+      (m/BoxDecoration
+        .border (m/Border.all .color th/venus-deep .width 1.0)
+        .borderRadius (m/BorderRadius.circular th/r-sm))
+      .child (txt "Aujourd'hui" 12.0 th/venus))))
+
+(defn spacer [h] (m/SizedBox .height h))
+
+(defn days-to [a b]
+  (let [d (- b a)] (if (< d 0.0) 0.0 d)))
+
+;; ------------------------------------------------------------------ section
+
+(defn header []
+  (m/Column
+    .crossAxisAlignment m/CrossAxisAlignment.start
+    .children
+    [(eyebrow "Cycle synodique · Vénus")
+     (spacer 10.0)
+     (txt-w "Le Voyage de Vénus" 32.0 th/ink m/FontWeight.w600)
+     (spacer 8.0)
+     (m/ConstrainedBox
+       .constraints (m/BoxConstraints .maxWidth 620.0)
+       .child
+       (txt "Descente, inframonde, ascension : le cycle de Vénus, ses portails et ses dates, calculés dans l'application."
+         14.0 th/ink-dim))]))
+
+(defn hero [s nextp]
+  (let [name (if (some? nextp)
+               (nth cyc/portal-names (mod (dec (:index nextp)) 8))
+               "Portail à venir")
+        idx (if (some? nextp) (:index nextp) 0)
+        when-str (if (some? nextp) (cyc/fmt-date (:jd nextp)) "—")
+        lon-str (if (some? nextp) (cyc/fmt-lon (:lon nextp)) "—")
+        in-days (if (some? nextp)
+                  (cyc/fmt-int (days-to (:jd s) (:jd nextp)))
+                  "—")]
+    (th/card
+      (m/Column
+        .crossAxisAlignment m/CrossAxisAlignment.start
+        .children
+        [(m/Row
+           .mainAxisAlignment m/MainAxisAlignment.spaceBetween
+           .children
+           [(eyebrow "Prochain portail")
+            (badge (str "portail " idx) th/venus)])
+         (spacer 12.0)
+         (txt-w name 21.0 th/ink m/FontWeight.w600)
+         (spacer 6.0)
+         (txt (str "Conjonction du " when-str ", à " lon-str " — portail " idx)
+           13.0 th/ink-dim)
+         (spacer 14.0)
+         (m/Wrap
+           .spacing 8.0
+           .runSpacing 8.0
+           .children
+           [(chip-status (str (:phase s) " · jour " (:day s) " / " (:cycle-length s)) th/venus)
+            (chip-status (str "encore " (:to-end s) " j") th/under)
+            (chip-status (str "portail dans " in-days " j") th/warn)])]))))
+
+(defn moment-card [s ui now]
+  (th/card
+    (m/Column
+      .crossAxisAlignment m/CrossAxisAlignment.start
+      .children
+      [(eyebrow "Moment observé")
+       (spacer 8.0)
+       (txt-w (cyc/fmt-moment (:jd s)) 18.0 th/ink m/FontWeight.w500)
+       (spacer 14.0)
+       (m/Wrap
+         .spacing 8.0
+         .runSpacing 8.0
+         .children
+         [(step-button "− 1 j" -1.0 ui)
+          (step-button "+ 1 j" 1.0 ui)
+          (step-button "+ 7 j" 7.0 ui)
+          (step-button "+ 30 j" 30.0 ui)
+          (reset-button ui now)])
+       (spacer 10.0)
+       (txt "Toutes les positions sont géocentriques, tropicales, apparentes."
+         11.0 th/ink-faint)])))
+
+(defn conj-line [label jd color]
+  (m/Row
+    .mainAxisAlignment m/MainAxisAlignment.spaceBetween
+    .children
+    [(m/Row
+       .children
+       [(dot color 6.0)
+        (m/SizedBox .width 8.0)
+        (txt label 12.0 th/ink-dim)])
+     (txt (cyc/fmt-date jd) 12.0 th/ink)]))
+
+(defn cycle-card [s]
+  (let [c (:cycle s)]
+    (th/card
+      (m/Column
+        .crossAxisAlignment m/CrossAxisAlignment.start
+        .children
+        [(eyebrow "Cycle en cours")
+         (spacer 8.0)
+         (txt-w (str (cyc/fmt-date (:start c)) " → " (cyc/fmt-date (:end c)))
+           16.0 th/ink m/FontWeight.w600)
+         (spacer 4.0)
+         (txt (str (cyc/fmt-num (:length c)) " jours") 12.0 th/ink-dim)
+         (spacer 16.0)
+         (conj-line "Conjonction inférieure" (:start c) th/venus)
+         (spacer 8.0)
+         (conj-line "Conjonction supérieure" (:superior c) th/under)
+         (spacer 8.0)
+         (conj-line "Conjonction inférieure" (:end c) th/venus)]))))
+
+(defn legend-item [label color]
+  (m/Row
+    .mainAxisSize m/MainAxisSize.min
+    .children
+    [(dot color 6.0)
+     (m/SizedBox .width 6.0)
+     (txt label 11.0 th/ink-faint)]))
+
+(defn cycle-band [c portals]
+  (let [len (:length c)
+        frac (fn [jd] (/ (- jd (:start c)) len))]
+    (th/card
+      (m/Column
+        .crossAxisAlignment m/CrossAxisAlignment.start
+        .children
+        [(eyebrow "Le cycle en un tour")
+         (spacer 12.0)
+         (m/LayoutBuilder
+           .builder
+           (fn [_ cons]
+             (let [w (.-maxWidth cons)]
+               (m/Stack
+                 .clipBehavior m/Clip.none
+                 .children
+                 [(m/Container
+                    .height 10.0
+                    .decoration
+                    (m/BoxDecoration
+                      .gradient
+                      (m/LinearGradient
+                        .begin m/Alignment.centerLeft
+                        .end m/Alignment.centerRight
+                        .colors [th/venus-deep th/venus th/under th/under-deep th/under th/venus th/venus-deep])
+                      .borderRadius (m/BorderRadius.circular 999.0)))
+                  (for [p portals]
+                    (m/Positioned
+                      .left (- (* w (frac (:jd p))) 1.0)
+                      .top -4.0
+                      .child
+                      (m/Container
+                        .width 2.0
+                        .height 18.0
+                        .decoration
+                        (m/BoxDecoration
+                          .color th/ink-dim
+                          .borderRadius (m/BorderRadius.circular 2.0)))))]))))
+         (spacer 12.0)
+         (m/Wrap
+           .spacing 14.0
+           .runSpacing 8.0
+           .children
+           [(legend-item "étoile du matin" th/venus)
+            (legend-item "étoile du soir" th/venus)
+            (legend-item "rétrogradation (42 j)" th/warn)
+            (legend-item "inframonde (73,1 j)" th/under)])
+         (spacer 10.0)
+         (txt "8 portails à la descente · 8 à l'ascension" 11.0 th/ink-faint)]))))
+
+(defn readout [label value sub color]
+  (th/soft-card
+    (m/Column
+      .crossAxisAlignment m/CrossAxisAlignment.start
+      .children
+      [(eyebrow label)
+       (spacer 6.0)
+       (txt-w value 15.0 th/ink m/FontWeight.w600)
+       (spacer 3.0)
+       (txt sub 11.0 color)])))
+
+(defn sky-grid [s]
+  (let [retro-txt (if (:retro s) "Rétrograde" "Direct")
+        items [(readout "Phase du cycle" (:phase s)
+                 (if (< (:elong s) 0.0)
+                   "Vénus se lève avant le Soleil"
+                   "Vénus se couche après le Soleil")
+                 th/venus)
+               (readout "Élongation au Soleil" (str (cyc/fmt-num (:elong s)) "°")
+                 (if (< (:elong s) 0.0) "visible le matin" "visible le soir")
+                 th/ink-dim)
+               (readout "Longitude de Vénus" (cyc/fmt-lon (:venus-lon s))
+                 (str "latitude " (cyc/fmt-num (:venus-lat s)) "°") th/ink-dim)
+               (readout "Mouvement" retro-txt
+                 (str "distance " (cyc/fmt-num (:venus-dist s)) " UA") th/ink-dim)
+               (readout "Lune aujourd'hui" (cyc/fmt-lon (:moon-lon s))
+                 "position actuelle" th/ink-dim)
+               (readout "Inframonde" "73 j"
+                 (str "du " (cyc/fmt-date (:underworld-start s)) " au "
+                      (cyc/fmt-date (:underworld-end s))) th/under)]]
+    (m/Column
+      .crossAxisAlignment m/CrossAxisAlignment.start
+      .children
+      [(eyebrow "Lecture du ciel")
+       (spacer 12.0)
+       (m/Column
+         .children
+         (for [pair (partition-all 2 items)]
+           (m/IntrinsicHeight
+             .child
+             (m/Row
+               .crossAxisAlignment m/CrossAxisAlignment.stretch
+               .children
+               [(m/Expanded .child (nth pair 0))
+                (m/SizedBox .width 12.0)
+                (m/Expanded
+                  .child
+                  (if (> (count pair) 1) (nth pair 1) (m/SizedBox .height 0.0)))]))))])))
+
+(def chakras
+  [{:name "Couronne" :sanskrit "Sahasrāra" :garment "la couronne de la steppe"}
+   {:name "Troisième œil" :sanskrit "Ājñā" :garment "les perles du cou"}
+   {:name "Gorge" :sanskrit "Viśuddha" :garment "le pectoral"}
+   {:name "Cœur" :sanskrit "Anāhata" :garment "le vêtement de pierre"}
+   {:name "Plexus" :sanskrit "Maṇipūra" :garment "les bracelets"}
+   {:name "Sacré" :sanskrit "Svādhiṣṭhāna" :garment "la ceinture"}
+   {:name "Racine" :sanskrit "Mūlādhāra" :garment "les sandales"}])
+
+(defn chakra-row [i c portal open ui]
+  (m/GestureDetector
+    .onTap (fn [_] (swap! ui assoc :open (if (= open i) nil i)))
+    .child
+    (m/Container
+      .margin (m/EdgeInsets.only .bottom 8.0)
+      .padding (m/EdgeInsets.all 12.0)
+      .decoration
+      (m/BoxDecoration
+        .color (m/Color.fromARGB 12 255 255 255)
+        .border (m/Border.all
+                  .color (if (= open i) th/venus-deep th/line-soft)
+                  .width 1.0)
+        .borderRadius (m/BorderRadius.circular th/r-sm))
+      .child
+      (m/Column
+        .crossAxisAlignment m/CrossAxisAlignment.start
+        .children
+        [(m/Row
+           .mainAxisAlignment m/MainAxisAlignment.spaceBetween
+           .children
+           [(m/Row
+              .children
+              [(badge (str (inc i)) th/ink-ghost)
+               (m/SizedBox .width 10.0)
+               (m/Column
+                 .crossAxisAlignment m/CrossAxisAlignment.start
+                 .children
+                 [(txt-w (:name c) 14.0 th/ink m/FontWeight.w500)
+                  (txt (:sanskrit c) 11.0 th/ink-faint)])])
+            (txt (:garment c) 11.0 th/ink-dim)])
+         (if (= open i)
+           (m/Padding
+             .padding (m/EdgeInsets.only .top 10.0)
+             .child
+             (txt (str "Porte " (inc i) " · conjonction Vénus-Lune du "
+                       (if (some? portal) (cyc/fmt-date (:jd portal)) "—")
+                       ", à "
+                       (if (some? portal) (cyc/fmt-lon (:lon portal)) "—"))
+               12.0 th/venus))
+           (m/SizedBox .height 0.0))]))))
+
+(defn descent [portals state ui]
+  (let [open (:open state)]
+    (m/Column
+      .crossAxisAlignment m/CrossAxisAlignment.start
+      .children
+      [(eyebrow "La descente · sept portes, sept chakras")
+       (spacer 8.0)
+       (txt-w "Les vêtements d'Inanna" 20.0 th/ink m/FontWeight.w600)
+       (spacer 6.0)
+       (m/ConstrainedBox
+         .constraints (m/BoxConstraints .maxWidth 620.0)
+         .child
+         (txt "À chaque conjonction Vénus-Lune, Vénus franchit une porte et abandonne un vêtement. L'ordre est celui de la descente : de la couronne à la racine. Touchez un centre pour lire le vêtement et la date."
+           13.0 th/ink-dim))
+       (spacer 14.0)
+       (m/Column
+         .children
+         (for [i (range (count chakras))]
+           (chakra-row i (nth chakras i)
+             (if (< i (count portals)) (nth portals i) nil)
+             open ui)))])))
+
+(defn underworld [s]
+  (let [c (:cycle s)
+        j1 (:underworld-start s)
+        j2 (:superior c)
+        j3 (:underworld-end s)]
+    (m/Column
+      .crossAxisAlignment m/CrossAxisAlignment.start
+      .children
+      [(eyebrow "Inframonde · les trois jours")
+       (spacer 10.0)
+       (m/Column
+         .children
+         (for [d [[1 "Jour 1" j1] [2 "Jour 2" j2] [3 "Jour 3" j3]]]
+           (m/Container
+             .margin (m/EdgeInsets.only .bottom 8.0)
+             .padding (m/EdgeInsets.all 14.0)
+             .decoration
+             (m/BoxDecoration
+               .gradient (m/LinearGradient
+                           .begin m/Alignment.centerLeft
+                           .end m/Alignment.centerRight
+                           .colors [(m/Color.fromARGB 40 59 29 110) (m/Color.fromARGB 10 59 29 110)])
+               .border (m/Border.all .color th/under-deep .width 1.0)
+               .borderRadius (m/BorderRadius.circular th/r-sm))
+             .child
+             (m/Row
+               .mainAxisAlignment m/MainAxisAlignment.spaceBetween
+               .children
+               [(txt-w (nth d 1) 13.0 th/ink m/FontWeight.w500)
+                (txt (cyc/fmt-date (nth d 2)) 12.0 th/ink-dim)])))))]))
+
+(defn footer []
+  (m/Column
+    .crossAxisAlignment m.CrossAxisAlignment.start
+    .children
+    [(txt "Éphéméride VSOP87 tronquée · position de la Lune d'après Meeus (ch. 47) · tout est calculé localement, sans réseau."
+       11.0 th/ink-faint)]))
+
+;; -------------------------------------------------------------------- écran
+
+(def stars
+  [[12.0 6.0 1.6] [28.0 18.0 1.2] [44.0 9.0 1.0] [61.0 22.0 1.4]
+   [76.0 12.0 1.0] [88.0 30.0 1.3] [18.0 34.0 1.1] [36.0 44.0 1.5]
+   [54.0 36.0 1.0] [70.0 48.0 1.2] [84.0 52.0 1.4] [8.0 58.0 1.1]
+   [24.0 66.0 1.3] [42.0 72.0 1.0] [58.0 62.0 1.5] [74.0 78.0 1.1]
+   [90.0 70.0 1.2] [16.0 84.0 1.4] [34.0 90.0 1.0] [50.0 94.0 1.2]
+   [66.0 88.0 1.3] [82.0 96.0 1.0] [6.0 96.0 1.2] [92.0 44.0 1.5]])
+
+(defn starfield []
+  (m/IgnorePointer
+    .child
+    (m/LayoutBuilder
+      .builder
+      (fn [_ cons]
+        (let [w (.-maxWidth cons) h (.-maxHeight cons)]
+          (m/Stack
+            .children
+            (for [[fx fy size] stars]
+              (m/Positioned
+                .left (* w (/ fx 100.0))
+                .top (* h (/ fy 100.0))
+                .child
+                (m/Container
+                  .width size
+                  .height size
+                  .decoration
+                  (m/BoxDecoration
+                    .color (m/Color.fromARGB 120 255 255 255)
+                    .shape m/BoxShape.circle))))))))))
+
+(defn page [state ui now]
+  (let [jd (:jd state)
+        s (cyc/sky jd)
+        c (:cycle s)
+        portals (cyc/cycle-portals c)
+        nextp (cyc/next-portal jd c)]
+    (m/Scaffold
+      .backgroundColor th/bg-deep
+      .body
+      (m/Stack
+        .children
+        [(m/Positioned.fill
+           .child
+           (m/DecoratedBox
+             .decoration (m/BoxDecoration .gradient (th/backdrop))))
+         (m/Positioned.fill .child (starfield))
+         (m/SafeArea
+           .child
+           (m/SingleChildScrollView
+             .child
+             (m/Center
+               .child
+               (m/ConstrainedBox
+                 .constraints (m/BoxConstraints .maxWidth 980.0)
+                 .child
+                 (m/Padding
+                   .padding (m/EdgeInsets.fromLTRB 20.0 28.0 20.0 40.0)
+                   .child
+                   (m/Column
+                     .crossAxisAlignment m/CrossAxisAlignment.start
+                     .children
+                     [(header)
+                      (spacer 20.0)
+                      (hero s nextp)
+                      (spacer 16.0)
+                      (moment-card s ui now)
+                      (spacer 16.0)
+                      (cycle-card s)
+                      (spacer 16.0)
+                      (cycle-band c portals)
+                      (spacer 16.0)
+                      (sky-grid s)
+                      (spacer 22.0)
+                      (descent portals state ui)
+                      (spacer 22.0)
+                      (underworld s)
+                      (spacer 22.0)
+                      (footer)])))))))])))

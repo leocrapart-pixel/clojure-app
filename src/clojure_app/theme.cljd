@@ -1,0 +1,59 @@
+(ns clojure-app.theme
+  "Palette et fonds du Voyage de Vénus."
+  (:require ["package:flutter/material.dart" :as m]))
+
+(defn rgb [r g b] (m/Color.fromARGB 255 r g b))
+
+(def bg-deep (rgb 3 3 8))
+(def bg (rgb 6 6 12))
+(def panel (rgb 13 15 26))
+(def panel-2 (rgb 10 12 21))
+(def line (rgb 33 37 56))
+(def line-soft (rgb 23 26 39))
+
+(def ink (rgb 236 238 246))
+(def ink-dim (rgb 164 170 189))
+(def ink-faint (rgb 108 114 136))
+(def ink-ghost (rgb 69 74 94))
+
+(def venus (rgb 124 224 176))
+(def venus-deep (rgb 44 127 94))
+(def under (rgb 139 92 246))
+(def under-deep (rgb 59 29 110))
+(def warn (rgb 240 166 60))
+(def danger (rgb 255 107 120))
+
+(def r 16.0)
+(def r-sm 10.0)
+
+(defn gradient-panel []
+  (m/LinearGradient
+    .begin m/Alignment.topLeft
+    .end m/Alignment.bottomRight
+    .colors [panel panel-2]))
+
+(defn backdrop []
+  (m/LinearGradient
+    .begin m/Alignment.topCenter
+    .end m/Alignment.bottomCenter
+    .colors [bg bg-deep]))
+
+(defn card [child]
+  (m/Container
+    .padding (m/EdgeInsets.all 20.0)
+    .decoration
+    (m/BoxDecoration
+      .gradient (gradient-panel)
+      .border (m/Border.all .color line .width 1.0)
+      .borderRadius (m/BorderRadius.circular r))
+    .child child))
+
+(defn soft-card [child]
+  (m/Container
+    .padding (m/EdgeInsets.all 16.0)
+    .decoration
+    (m/BoxDecoration
+      .color (rgb 12 14 24)
+      .border (m/Border.all .color line-soft .width 1.0)
+      .borderRadius (m/BorderRadius.circular r-sm))
+    .child child))

@@ -1,0 +1,183 @@
+(ns clojure-app.cycle
+  "Dérivés du cycle synodique : conjonctions, bornes du cycle, portails et
+  lecture du ciel. Tout est calculé à la volée à partir de clojure-app.astro."
+  (:require [clojure-app.astro :as astro]
+            [cljd.math :as math]
+            [cljd.string :as str]))
+
+(def portal-names
+  ["Portail de la Vision"
+   "Portail de la Communication"
+   "Portail de la Compassion"
+   "Portail du Pouvoir Personnel"
+   "Portail de la Manifestation"
+   "Portail de la Mort intentionnelle"
+   "Portail de la Vie intentionnelle"
+   "Portail de l'Autorité"])
+
+(def signs
+  ["Bélier" "Taureau" "Gémeaux" "Cancer" "Lion" "Vierge"
+   "Balance" "Scorpion" "Sagittaire" "Capricorne" "Verseau" "Poissons"])
+
+(def months
+  ["janvier" "février" "mars" "avril" "mai" "juin"
+   "juillet" "août" "septembre" "octobre" "novembre" "décembre"])
+
+(def weekdays
+  ["lundi" "mardi" "mercredi" "jeudi" "vendredi" "samedi" "dimanche"])
+
+;; ---------------------------------------------------------------- formatage
+
+(defn- abs* [x]
+  (if (< x 0.0) (- 0.0 x) x))
+
+(defn pad2 [n]
+  (if (< n 10) (str "0" n) (str n)))
+
+(defn fmt-num
+  "Un nombre à une décimale, virgule française."
+  [x]
+  (let [v (/ (math/round (* x 10.0)) 10.0)]
+    (str/replace (str v) "." ",")))
+
+(defn fmt-int [x]
+  (str (math/round x)))
+
+(defn fmt-lon
+  "210.02 -> « 0°1′ Scorpion »."
+  [lon]
+  (let [l (astro/normalize-deg lon)
+        s (math/floor (/ l 30.0))
+        within (- l (* s 30.0))
+        d (math/floor within)
+        m (math/round (* (- within d) 60.0))
+        d2 (if (> m 59) (inc d) d)
+        m2 (if (> m 59) 0 m)]
+    (str (fmt-int d2) "°" (fmt-int m2) "′ " (nth signs (mod (math/round s) 12)))))
+
+(defn fmt-date [jd]
+  (let [dt (astro/date-of jd)]
+    (str (.-day dt) " " (nth months (dec (.-month dt))) " " (.-year dt))))
+
+(defn fmt-date-long [jd]
+  (let [dt (astro/date-of jd)]
+    (str (nth weekdays (dec (.-weekday dt))) " " (fmt-date jd))))
+
+(defn fmt-time [jd]
+  (let [dt (astro/date-of jd)]
+    (str (pad2 (.-hour dt)) ":" (pad2 (.-minute dt)))))
+
+(defn fmt-moment [jd]
+  (str (fmt-date jd) ", " (fmt-time jd)))
+
+;; ------------------------------------------------------------- convergence
+
+(defn- bisect
+  "Zéro d'une fonction qui change de signe entre lo et hi."
+  [f lo hi]
+  (loop [lo lo hi hi i 0]
+    (if (< i 42)
+      (let [mid (* 0.5 (+ lo hi))]
+        (if (< (f mid) 0.0)
+          (recur mid hi (inc i))
+          (recur lo mid (inc i))))
+      (* 0.5 (+ lo hi)))))
+
+(def conjunctions-step 0.5)
+
+(defn conjunctions
+  "Conjonctions Vénus-Soleil entre deux jours juliens."
+  [from to]
+  (let [f (fn [jd] (astro/elongation jd))]
+    (loop [jd from prev (f from) acc []]
+      (if (> jd to)
+        acc
+        (let [cur (f jd)]
+          (if (not= (< prev 0.0) (< cur 0.0))
+            (let [t (bisect f (- jd conjunctions-step) jd)
+                  v (astro/venus-geo t)]
+              (recur (+ jd conjunctions-step) cur
+                (conj acc {:jd t
+                           :kind (if (< (:dist v) 1.3) "inférieure" "supérieure")
+                           :lon (:lon v)})))
+            (recur (+ jd conjunctions-step) cur acc)))))))
+
+(defn- inferior? [c] (= (:kind c) "inférieure"))
+
+(defn cycle-at
+  "Cycle synodique qui contient (ou précède immédiatement) l'instant jd."
+  [jd]
+  (let [cs (conjunctions (- jd 420.0) (+ jd 720.0))
+        before (filter #(and (inferior? %) (<= (:jd %) jd)) cs)
+        start (if (seq before) (:jd (last before)) jd)
+        after (filter #(and (inferior? %) (> (:jd %) jd)) cs)
+        end (if (seq after) (:jd (first after)) (+ start 584.0))
+        superior (first (filter #(and (not (inferior? %))
+                                      (> (:jd %) start)
+                                      (< (:jd %) end))
+                                cs))]
+    {:start start
+     :end end
+     :superior (if (some? superior) (:jd superior) (+ start 292.0))
+     :superior-lon (:lon superior)
+     :length (- end start)}))
+
+;; ----------------------------------------------------------------- portails
+
+(defn portals
+  "Conjonctions Vénus-Lune (les portes d'Inanna) entre deux jours juliens."
+  [from to]
+  (let [f (fn [jd] (astro/signed-deg (- (astro/moon-lon jd) (:lon (astro/venus-geo jd)))))]
+    (loop [jd from prev (f from) acc []]
+      (if (> jd to)
+        acc
+        (let [cur (f jd)]
+          (if (and (not= (< prev 0.0) (< cur 0.0))
+                   (< (abs* prev) 20.0)
+                   (< (abs* cur) 20.0))
+            (let [t (bisect f (- jd conjunctions-step) jd)]
+              (recur (+ jd conjunctions-step) cur
+                (conj acc {:jd t :lon (:lon (astro/venus-geo t))})))
+            (recur (+ jd conjunctions-step) cur acc)))))))
+
+(defn cycle-portals
+  "Portails du cycle, numérotés depuis le début de la descente."
+  [{:keys [start end]}]
+  (let [ps (portals start end)]
+    (vec (map-indexed (fn [i p] (assoc p :index (inc i))) ps))))
+
+(defn next-portal
+  "Premier portail à venir, avec son numéro dans le cycle."
+  [jd {:keys [start end] :as cycle}]
+  (let [ps (cycle-portals cycle)
+        upcoming (filter #(> (:jd %) jd) ps)]
+    (first upcoming)))
+
+;; -------------------------------------------------------- lecture du ciel
+
+(defn days-to [jd target] (- target jd))
+
+(defn sky
+  "Toutes les grandeurs affichées dans « Lecture du ciel »."
+  [jd]
+  (let [v (astro/venus-geo jd)
+        elong (astro/elongation jd)
+        moon (astro/moon-lon jd)
+        retro (astro/retrograde? jd)
+        cycle (cycle-at jd)
+        underworld-start (- (:superior cycle) 36.55)
+        underworld-end (+ (:superior cycle) 36.55)]
+    {:jd jd
+     :venus-lon (:lon v)
+     :venus-lat (:lat v)
+     :venus-dist (:dist v)
+     :elong elong
+     :phase (if (< elong 0.0) "Étoile du matin" "Étoile du soir")
+     :moon-lon moon
+     :retro retro
+     :cycle cycle
+     :underworld-start underworld-start
+     :underworld-end underworld-end
+     :day (inc (math/round (- jd (:start cycle))))
+     :cycle-length (math/round (:length cycle))
+     :to-end (math/round (- (:end cycle) jd))}))
